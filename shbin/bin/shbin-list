@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+
+#!/usr/bin/env bash
+
+if [ "$SHBIN_HOME" = "" ]; then
+  echo '$SHBIN_HOME NOT SET'
+  exit 1
+fi
+
+cd "$SHBIN_HOME"
+DONE="$(./src/AnsiTTY '@{f:green,bold DONE}@' 2>/dev/null)"
+if [ "$DONE" = "" ]; then
+  DONE="DONE"
+fi
+
+for s in `find ./src -name "*.sh" -type f`; do
+  source "$s"
+done
+
+echo "DONLOADING PACKAGES INFOS..." && getPkgs && echo -e "$DONE"
+
+echo "Reading remote packages list..."
+pack=false
+name=""
+version=""
+desc=""
+link=""
+while IFS='' read -r line || [[ -n "$line" ]]; do
+  trimmed="$(./src/trim $line)"
+  if ! [ "$trimmed" = "" ]; then
+    if [ "$trimmed" = "pack" ]; then
+      pack=true
+      continue
+    elif ! $pack; then
+      echo "ERROR parsing packages file!"
+    fi
+    
+    if $pack; then
+      if [ "$trimmed" = "end" ]; then
+        format="\e[1;34m"
+        if grep -E "^$name.*" >/dev/null <./etc/installed-packages; then
+          format="\e[1;32m"
+          l=$(grep -E "^$name.*" <./etc/installed-packages | head -n1 | cut -f2 -d'|')
+          if ! [ "$l" = "" ]; then
+            if ! [ "$l" = "$version" ]; then
+              format="\e[1;31m"
+            fi
+          fi
+        fi
+        echo -n -e "$format"
+        
+        pack=false
+        echo "Package found:"
+        echo -e "\tNAME: $name"
+        echo -e "\tLINK: $link"
+        echo -e "\tVERSION: $version"
+        echo -e "\tDESC: $desc"
+        echo -en "\n\n"
+        cols="$(tput cols)"
+        sep=""
+        for c in `seq 1 1 $cols`; do
+          sep="$sep""="
+        done
+        
+        echo -en "$sep\e[m\n\n"
+      else
+        lbl=$(echo -n "$trimmed" | cut -f1 -d" ")
+        val=${trimmed:${#lbl}:$(expr ${#trimmed} '-' ${#lbl})}
+        val="$(./src/trim $val)"
+        if [ "$lbl" = "n:" ]; then
+          name="$val"
+        elif [ "$lbl" = "v:" ]; then
+          version="$val"
+        elif [ "$lbl" = "l:" ]; then
+          link="$val"
+        elif [ "$lbl" = "d:" ]; then
+          desc="$val"
+        else
+          echo "Error parsing packages file"
+        fi
+      fi
+    fi
+  fi
+done < "./tmp/pkgs"
+
+exit 0

@@ -1,0 +1,137 @@
+#!/usr/bin/env bash
+
+if [ "$SHBIN_HOME" = "" ]; then
+  echo '$SHBIN_HOME NOT SET'
+  exit 1
+fi
+
+cd "$SHBIN_HOME"
+out="./src/AnsiTTY"
+chmod +x "$out"  
+
+DONE="$(./src/AnsiTTY '@{f:green,bold DONE}@' 2>/dev/null)"
+if [ "$DONE" = "" ]; then
+  DONE="DONE"
+fi
+
+for s in `find ./src -name "*.sh" -type f`; do
+  source "$s"
+done
+
+echo "DONLOADING PACKAGES INFOS..." && getPkgs && echo -e "$DONE"
+echo "Reading remote packages list..."
+echo "Reading local packages list..."
+
+tlines="$(wc -l <./etc/installed-packages 2>/dev/null)"
+if [ "$tlines" = "" ]; then
+  tlines=1
+fi
+clines=1
+
+first=false
+installed=""
+sep=""
+echo -ne "\e7"
+while IFS='' read -r line || [[ -n "$line" ]]; do
+  prg_perc="$(expr 100 '*' $clines '/' $tlines)"
+  progressBar $prg_perc
+  clines="$(expr $clines '+' 1)"
+
+  toupdate=false
+
+  name="$(echo $line | cut -f1 -d'|')"
+  version="$(echo $line | cut -f2 -d'|')"
+  tname="$(./src/trim $name)"
+  tversion="$(./src/trim $version)"
+  
+  if [ "$tversion" = "" ]; then
+    toupdate=true
+  fi
+  
+  if ! $toupdate; then
+    pack=false
+    name=""
+    fname=""
+    version=""
+    fversion=""
+    desc=""
+    link=""
+    found=false
+    while IFS='' read -r line || [[ -n "$line" ]]; do
+      if ! $found; then
+        trimmed="$(./src/trim $line)"
+        if ! [ "$trimmed" = "" ]; then
+          if [ "$trimmed" = "pack" ]; then
+            pack=true
+            continue
+          elif ! $pack; then
+            echo "ERROR parsing packages file!"
+          fi
+          
+          if $pack; then
+            if [ "$trimmed" = "end" ]; then
+              pack=false
+              if [ "$name" = "$tname" ]; then
+                found=true
+                if ! [ "$version" = "$tversion" ]; then
+                  toupdate=true
+                fi
+                break
+              fi
+            else
+              lbl=$(echo -n "$trimmed" | cut -f1 -d" ")
+              val=${trimmed:${#lbl}:$(expr ${#trimmed} '-' ${#lbl})}
+              val="$(./src/trim $val)"
+              if [ "$lbl" = "n:" ]; then
+                name="$val"
+              elif [ "$lbl" = "v:" ]; then
+                version="$val"
+              elif [ "$lbl" = "l:" ]; then
+                link="$val"
+              elif [ "$lbl" = "d:" ]; then
+                desc="$val"
+              else
+                echo "Error parsing packages file"
+              fi
+            fi
+          fi
+        fi
+      fi
+    done < "./tmp/pkgs"
+  fi
+  
+  if $toupdate; then
+    cmd="$sep""$tname"
+    installed="$installed""$cmd"
+    sep="\t"
+  fi
+done < "./etc/installed-packages"
+
+echo -e "\e7"
+
+if [ "$installed" = "" ]; then
+  echo "Nothing to update."
+  exit 0
+fi
+
+echo -n "Update ${installed/\\t/, }? [Y/n]: "
+read -r r
+
+installed="$(echo -n -e ""$installed"")"
+
+if [ "$r" = "" -o "$r" = "y" -o "$r" = "Y" ]; then
+  echo "Updating..."
+  
+  for a in $installed; do
+    echo "Update $a..."
+    if [ "$a" = "" ]; then
+      echo "Skipping..."
+    else
+      ./bin/shbin install -f -y "$a"
+    fi
+  done
+else
+  exit 0
+fi
+
+exit 0

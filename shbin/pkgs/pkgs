@@ -1,0 +1,49 @@
+pack
+  n: ides
+  l: http://minegrado.ovh/shbin/pkgs/ides.tar.gz
+  v: 0.1.0
+  d: Ides starter
+end
+
+pack
+  n: jregex
+  l: http://minegrado.ovh/shbin/pkgs/jregex.tar.gz
+  v: 0.1.0
+  d: Regex pattern matcher written in Java
+end
+
+pack
+  n: pregex
+  l: http://minegrado.ovh/shbin/pkgs/pregex.tar.gz
+  v: 0.1.0a
+  d: Regex pattern matcher written in Python
+end
+
+pack
+  n: regex
+  l: http://minegrado.ovh/shbin/pkgs/regex.tar.gz
+  v: 0.1.0
+  d: Regex pattern matcher written in C++
+end
+
+pack
+  n: full-upgrade
+  l: http://minegrado.ovh/shbin/pkgs/full-upgrade.tar.gz
+  v: 2
+  d: Upgrade all
+end
+
+pack
+  n: picalc
+  l: http://minegrado.ovh/shbin/pkgs/picalc.tar.gz
+  v: 1.5a
+  d: A PiGreco calculator written in C++ with -O2.
+end
+
+pack
+  n: cpregex
+  l: http://minegrado.ovh/shbin/pkgs/cpregex.tar.gz
+  v: 0.1.0
+  d: Regex pattern matcher written in Python and compiled with Cython. Optimized with -O3 flag, may not work on all systems.
+end
+

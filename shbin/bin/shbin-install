@@ -1,0 +1,189 @@
+#!/usr/bin/env bash
+
+if [ "$SHBIN_HOME" = "" ]; then
+  echo '$SHBIN_HOME NOT SET'
+  exit 1
+fi
+
+cd "$SHBIN_HOME"
+DONE="$(./src/AnsiTTY '@{f:green,bold DONE}@' 2>/dev/null)"
+if [ "$DONE" = "" ]; then
+  DONE="DONE"
+fi
+
+for s in `find ./src -name "*.sh" -type f`; do
+  source "$s"
+done
+
+force=false
+ayes=false
+if [ "$1" = "-f" ]; then
+  echo "$(./src/AnsiTTY '@{f:blue Force install @{f:bg_yellow ON}@}@')"
+  force=true
+  shift
+elif [ "$1" = "-y" ]; then
+  echo "$(./src/AnsiTTY '@{f:blue Assume yes @{f:bg_yellow ON}@}@')"
+  ayes=true
+  shift
+fi
+
+if [ "$1" = "-f" ]; then
+  echo "$(./src/AnsiTTY '@{f:blue Force install @{f:bg_yellow ON}@}@')"
+  force=true
+  shift
+elif [ "$1" = "-y" ]; then
+  echo "$(./src/AnsiTTY '@{f:blue Assume yes @{f:bg_yellow ON}@}@')"
+  ayes=true
+  shift
+fi
+
+if [ "$1" = "" ]; then
+  echo "Nothing to install..."
+  exit 1
+fi
+
+echo "DONLOADING PACKAGES INFOS..." && getPkgs && echo -e "$DONE"
+
+#echo "Checking if already installed..."
+#if [ -s ./etc/installed-packages ]; then
+#  if grep ./etc/installed-packages; then
+#    echo "Pack already installed"
+#    exit 2
+#  fi
+#else
+#  touch ./etc/installed-packages
+#fi
+
+echo "Reading remote packages list..."
+pack=false
+name=""
+fname=""
+version=""
+fversion=""
+desc=""
+link=""
+found=false
+while IFS='' read -r line || [[ -n "$line" ]]; do
+  if ! $found; then
+    trimmed="$(./src/trim $line)"
+    if ! [ "$trimmed" = "" ]; then
+      if [ "$trimmed" = "pack" ]; then
+        pack=true
+        continue
+      elif ! $pack; then
+        echo "ERROR parsing packages file!"
+      fi
+      
+      if $pack; then
+        if [ "$trimmed" = "end" ]; then
+          pack=false
+          if [ "$name" = "$1" ]; then
+            found=true
+            fname="$name"
+            fversion="$version"
+            echo "Package found:"
+            echo -e "\tNAME: $name"
+            echo -e "\tLINK: $link"
+            echo -e "\tVERSION: $version"
+            echo -e "\tDESC: $desc"
+            break
+          fi
+        else
+          lbl=$(echo -n "$trimmed" | cut -f1 -d" ")
+          val=${trimmed:${#lbl}:$(expr ${#trimmed} '-' ${#lbl})}
+          val="$(./src/trim $val)"
+          if [ "$lbl" = "n:" ]; then
+            name="$val"
+          elif [ "$lbl" = "v:" ]; then
+            version="$val"
+          elif [ "$lbl" = "l:" ]; then
+            link="$val"
+          elif [ "$lbl" = "d:" ]; then
+            desc="$val"
+          else
+            echo "Error parsing packages file"
+          fi
+        fi
+      fi
+    fi
+  fi
+done < "./tmp/pkgs"
+
+installed=false
+
+while IFS='' read -r line || [[ -n "$line" ]]; do
+  line="$(echo $line | cut -f1 -d'|')"
+  trimmed="$(./src/trim $line)"
+  if [ "$fname" = "$trimmed" ]; then
+    if ! $force; then
+      echo "Package already installed."
+      exit 0
+    else
+      echo "Package already installed... Reinstalling..."
+      installed=true
+      break
+    fi
+  fi
+done < "./etc/installed-packages"
+
+if $found; then
+  r=""
+  echo "Installing pack..."
+  echo -n "Install? [Y/n]: "
+  
+  if ! $ayes; then
+    read -r r
+  else
+    echo "Y"
+  fi
+  
+  if [ "$r" = "" -o "$r" = "y" -o "$r" = "Y" ] || $ayes; then
+    echo "Installing..."
+    
+    cd "$SHBIN_HOME/tmp"
+    mkdir "$fname"
+    cd "$fname"
+    wget "$link" -O d.tar.gz 2>&1 | progressFilter && echo -e "$DONE"
+    gzip -df d.tar.gz
+    tar -xf d.tar
+    rm d.tar
+    
+    arg=""
+    if $force; then
+      echo "Forcing..."
+      arg="-f"
+    fi
+    
+    echo "Intalling libs..."
+    if [ -d "lib" ]; then
+      cp $arg -r lib/* "$SHBIN_HOME"/lib && echo -e "$DONE"
+    fi
+    echo "Installing bins..."
+    if [ -d "bin" ]; then
+      cp $arg -r bin/* "$SHBIN_HOME"/bin && echo -e "$DONE"
+    fi
+    cd ..
+    rm -r "$fname"
+    cd "$SHBIN_HOME"
+    rm tmp/pkgs
+    
+    if $force; then
+      if $installed; then
+        sed -i'.bak' -e 's/^'"$fname.*"'/'"$fname|$fversion"'/g' "./etc/installed-packages"
+      else
+        echo "$fname|$fversion" >>"./etc/installed-packages"
+      fi
+    else
+      echo "$fname|$fversion" >>"etc/installed-packages"
+    fi
+    
+    echo "INSTALLED."
+  else
+    echo "Aborting..."
+    exit 0
+  fi
+else
+  echo "Pack not found!"
+fi
+
+exit 0

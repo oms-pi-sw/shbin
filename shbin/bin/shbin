@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+
+cmd="$1"
+shift
+
+install="shbin-install"
+update="shbin-update"
+list="shbin-list"
+
+if [ "$cmd" = "" ]; then
+  echo "NO COMMAND"
+  exit 1
+fi
+
+case "$cmd" in
+  "install")
+    eval "$install $@"
+  ;;
+  "update")
+    eval "$update $@"
+  ;;
+  "list")
+    eval "$list $@"
+  ;;
+  *)
+    echo "ERROR: COMMAND NOT FOUND."
+    exit 1
+esac
+
+exit 0
